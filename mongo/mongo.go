@@ -4,56 +4,16 @@ import (
 	"context"
 	"log"
 
-	"github.com/RecursionExcursion/go-toolkit/core"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-//TODO decouple other lib packages like EnvGetorPanic and LogError
-
-var atlasUri = func() string {
-	uri, err := core.EnvGet("ATLAS_URI")
-	if err != nil {
-		panic(err)
-	}
-	return uri
-}()
-
 type MongoConnection[T any] struct {
 	Db         string
 	Collection string
-}
-
-func connectMongoClient() (*mongo.Client, error) {
-	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
-	opts := options.Client().ApplyURI(atlasUri).SetServerAPIOptions(serverAPI)
-
-	client, err := mongo.Connect(context.TODO(), opts)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
-}
-
-type queryFn[T any] func(c *mongo.Collection) (T, error)
-
-/* mongoQuery creates, manages, and closes connection while executingthe custom query fn passed in */
-func mongoQuery[T any](mc MongoConnection[T], query queryFn[T]) (T, error) {
-	client, err := connectMongoClient()
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if err := client.Disconnect(context.TODO()); err != nil {
-			panic(err)
-		}
-	}()
-
-	db := client.Database(mc.Db)
-	c := db.Collection(mc.Collection)
-	return query(c)
+	atlasUrI   string
 }
 
 /* Generic Mongo Query Fns */
@@ -146,4 +106,35 @@ func (mc *MongoConnection[T]) DeleteById(id string) (bool, error) {
 		return t, nil
 	})
 	return err == nil, err
+}
+
+// connetion logic
+func connectMongoClient(atlasUri string) (*mongo.Client, error) {
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+	opts := options.Client().ApplyURI(atlasUri).SetServerAPIOptions(serverAPI)
+
+	client, err := mongo.Connect(context.TODO(), opts)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+type queryFn[T any] func(c *mongo.Collection) (T, error)
+
+/* mongoQuery creates, manages, and closes connection while executingthe custom query fn passed in */
+func mongoQuery[T any](mc MongoConnection[T], query queryFn[T]) (T, error) {
+	client, err := connectMongoClient(mc.atlasUrI)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := client.Disconnect(context.TODO()); err != nil {
+			panic(err)
+		}
+	}()
+
+	db := client.Database(mc.Db)
+	c := db.Collection(mc.Collection)
+	return query(c)
 }

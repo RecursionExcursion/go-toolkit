@@ -8,11 +8,14 @@ import (
 	"strings"
 )
 
-var envLoaded bool = false
+type EnvLoader struct {
+	loaded bool
+}
 
-func EnvGet(key string) (string, error) {
-	if !envLoaded {
-		if err := EnvLoader(); err != nil {
+// returns value associated with key or an error if no key is found
+func (el *EnvLoader) Get(key string) (string, error) {
+	if !el.loaded {
+		if err := el.LoadEnv(); err != nil {
 			return "", err
 		}
 	}
@@ -24,10 +27,10 @@ func EnvGet(key string) (string, error) {
 	return val, nil
 }
 
-/* EnvGetOrPanic loads EnvVars if not already loaded, then retrieves the var or panics if not set */
-func EnvGetOrPanic(key string) string {
-	if !envLoaded {
-		if err := EnvLoader(); err != nil {
+// returns value associated with key or panics if no key is found
+func (el *EnvLoader) MustGet(key string) string {
+	if !el.loaded {
+		if err := el.LoadEnv(); err != nil {
 			panic(err)
 		}
 	}
@@ -39,9 +42,10 @@ func EnvGetOrPanic(key string) string {
 	return val
 }
 
-func EnvGetOrFallback(key string, fallback string) string {
-	if !envLoaded {
-		if err := EnvLoader(); err != nil {
+// returns value associated with key or fallback if no key is found
+func (el *EnvLoader) GetOrFallback(key string, fallback string) string {
+	if !el.loaded {
+		if err := el.LoadEnv(); err != nil {
 			return fallback
 		}
 	}
@@ -53,24 +57,20 @@ func EnvGetOrFallback(key string, fallback string) string {
 	return val
 }
 
-func EnvGetOrDefault(key string) string {
-	if !envLoaded {
-		if err := EnvLoader(); err != nil {
+// returns value associated with key or zero value ("") if no key is found
+func (el *EnvLoader) GetOrDefault(key string) string {
+	if !el.loaded {
+		if err := el.LoadEnv(); err != nil {
 			return ""
 		}
 	}
 	return os.Getenv(key)
 }
 
-/* EnvLoader loads files into env
- * Variables are expected to be in <key> = <value> format
- * If no files are provided by the called the loader will
- * attempt to load a .env file.
- */
-func EnvLoader(files ...string) error {
-	defer func() {
-		envLoaded = true
-	}()
+// LoadEnv loads environment variables from one or more files into the process's environment.
+// Files should contain lines in the format KEY=VALUE.
+// If no files are provided, it defaults to loading from ".env".
+func (el *EnvLoader) LoadEnv(files ...string) error {
 
 	if len(files) == 0 {
 		return loadOsEnv(".env")
@@ -81,6 +81,7 @@ func EnvLoader(files ...string) error {
 			return err
 		}
 	}
+	el.loaded = true
 	return nil
 }
 
